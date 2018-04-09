@@ -1,0 +1,124 @@
+#ifndef DEFINE_H
+#define DEFINE_H
+
+#define FLIT_SIZE 128
+#define PHIT_SIZE 256
+#define IN_Q_SIZE 512												// input buffer size			// directly related with the link credit, if the input queue is full, then the credit available will be 0
+#define VC_SIZE 16 // has to bigger than PACKET_SIZE				// the number of flits can be stored in VC buffers (FIFOs)
+#define VC_NUM 1			// don't change this one
+
+#define ALLOW_VC_NUM 1		// modify this one to change the number of VCs per port		// Used in VCs.cpp when assigning idle VC to headflits
+#define XSIZE 8
+#define YSIZE 8
+#define ZSIZE 8
+#define XW 3
+#define YW 3
+#define ZW 3
+#define DSTW 9
+#define DIR_INJECT 0
+/*
+port id 0: xpos
+port id 1: ypos
+port id 2: zpos
+port id 3: xneg
+port id 4: yneg
+port id 5: zneg
+
+*/
+#define DIR_XPOS 1
+#define DIR_YPOS 2
+#define DIR_ZPOS 3
+#define DIR_XNEG 4
+#define DIR_YNEG 5
+#define DIR_ZNEG 6
+#define DIR_EJECT 7
+#define LINKDELAY 10																			// For Hoplite NoC, change the link latency to 1, means 1 cycle
+
+// Specify the input source for the output port
+#define OUT_FROM_XNEG 0
+#define OUT_FROM_YNEG 1
+#define OUT_FROM_ZNEG 2
+#define OUT_FROM_INJECTION 3
+#define OUT_IDLE 4
+
+// Specify the input ports
+#define IN_PORT_XNEG 0
+#define IN_PORT_YNEG 1
+#define IN_PORT_ZNEG 2
+
+// Specify the output ports
+#define OUT_PORT_XPOS 0
+#define OUT_PORT_YPOS 1
+#define OUT_PORT_ZPOS 2
+
+/* packet format
+* head flit
+|FLIT type (3 bits)| VC class (1 bit) | dst z (3 bits) | dst y (3 bits) | dst x (3 bits) | priority field (4 bits) | src z (3 bits)| src y (3 bits)| src x (3 bits)| packet id (16 bits)| payload (66 bits)|
+body flit
+|FLIT type (3 bits)| payload|
+tail flit
+|FLIT type (3 bits)| payload|
+*/
+
+#define HEADER_LEN 3
+#define ROUTE_LEN  3
+#define HEAD_FLIT 0
+#define BODY_FLIT 1
+#define TAIL_FLIT 2
+#define SINGLE_FLIT 3
+#define CREDIT_FLIT 4
+
+
+#define VC_CLASS_POS  FLIT_SIZE - HEADER_LEN - 1
+#define IN_PORT_NUM 3
+#define OUT_PORT_NUM 3
+#define PORT_NUM  3
+#define DST_ZPOS  VC_CLASS_POS - 1
+#define DST_YPOS  DST_ZPOS - ZW
+#define DST_XPOS  DST_YPOS - YW
+#define CMP_POS  DST_XPOS - XW
+#define CMP_LEN 4
+
+
+#define ERR_NO_ERROR  0
+#define ERR_FLIT_WRONG 1
+#define ERR_FLIT_MISSING 2
+#define ERR_FLIT_TIMEOUT 3
+#define ERR_PCKT_TIMEOUT 4
+#define ERR_PCKT_WRONG 5
+
+
+#define ROUTING_MODE_NUM 5
+#define ROUTING_DOR_XYZ 0
+#define ROUTING_ROMM 1
+#define ROUTING_RCA 2
+#define ROUTING_O1TURN 3
+#define ROUTING_RLB_XYZ 4
+
+#define VC_IDLE 0
+#define VC_WAITING_FOR_OVC 1
+#define VC_ACTIVE 2
+#define VC_WAITING_FOR_CREDITS 3
+
+
+#define SA_MODE_NUM 3
+#define SA_FARTHEST_FIRST 0
+#define SA_OLDEST_FIRST 1
+#define SA_MIXED 2
+
+#define SA_AGE_THRESHOLD 500
+
+//#define INPUT_Q_SIZE 256
+#define INPUT_Q_SIZE 1									// set as bufferless
+#define CREDIT_BACK_PERIOD 100
+#define CREDIT_THRESHOlD CREDIT_BACK_PERIOD + LINKDELAY + 20
+
+#define INJECTION_NEAREST_NEIGHBOR 1
+#define INJECTION_GAP 0
+#define PACKET_NUM 20
+#define PACKET_SIZE 10
+
+#define EJECT_IDLE 0
+#define EJECT_RECVING 1
+#define EJECT_ERROR 2
+#endif
