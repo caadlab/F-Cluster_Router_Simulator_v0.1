@@ -31,6 +31,13 @@ public:
     int credit_period_counter;
 	int downstream_vc_credits[PORT_NUM][VC_NUM];
 
+	int upstream_vc_class_0_free_num[PORT_NUM];
+	int upstream_vc_class_1_free_num[PORT_NUM];
+	int downstream_vc_class_0_free_num[PORT_NUM];
+	int downstream_vc_class_1_free_num[PORT_NUM];
+	int* downstream_vc_class_0_free_num_ptr[PORT_NUM];
+	int* downstream_vc_class_1_free_num_ptr[PORT_NUM];
+
     //input buffers
     fifo input_buffer_list[PORT_NUM];
 
@@ -67,7 +74,7 @@ public:
 
 	int packet_size;
 
-    //
+    
     bool occupy_by_inject[PORT_NUM]; //bool value denoting the out port is occupy the inject traffic
 	bool occupy_by_passthru[PORT_NUM];
     

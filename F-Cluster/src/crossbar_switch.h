@@ -27,11 +27,13 @@ public:
    bool* out_avail_to_tree[PORT_NUM];
 
    flit out[PORT_NUM];
-   
 
    reduction_tree tree_list[PORT_NUM];
 
-   void crossbar_switch_init(int Cur_x, int Cur_y, int Cur_z, int Mode, flit** In_list, bool** Out_avail);
+   int* downstream_vc_class_0_free_num[PORT_NUM];
+   int* downstream_vc_class_1_free_num[PORT_NUM];
+
+   void crossbar_switch_init(int Cur_x, int Cur_y, int Cur_z, int Mode, flit** In_list, bool** Out_avail, int** Downsteam_free_VC_0, int** Downsteam_free_VC_1);
    void consume();
    int produce();
    bool lookup_in_avail(int port_id, int our_dir);

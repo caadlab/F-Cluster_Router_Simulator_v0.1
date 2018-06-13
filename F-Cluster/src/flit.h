@@ -23,6 +23,8 @@ public:
     int payload;
     int packet_size;
 	int vc_credit[VC_NUM];
+	int vc_class_0_free_num;
+	int vc_class_1_free_num;
 
 	char O1TURN_id; //used when using O1TURN mode
 

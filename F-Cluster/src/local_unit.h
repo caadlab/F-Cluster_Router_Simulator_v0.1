@@ -9,6 +9,7 @@ public:
     flit* eject[PORT_NUM];
     
     bool inject_avail_latch[PORT_NUM];
+	bool prev_inject_avail_latch[PORT_NUM];
 	bool inject_avail_post_latch[PORT_NUM];
     flit eject_latch[PORT_NUM];
 	int credit_period_counter;
@@ -42,7 +43,10 @@ public:
 	int routing_mode;
 	int sa_mode;
 
-	void local_unit_init(int Cur_x, int Cur_y, int Cur_z, int Mode, int Injection_gap, int Packet_size, int Packet_num, flit** Eject, bool** Inject_avail, int Routing_mode, int SA_Mode);
+	int* downstream_vc_class_0_free_num[PORT_NUM];
+	int* downstream_vc_class_1_free_num[PORT_NUM];
+
+	void local_unit_init(int Cur_x, int Cur_y, int Cur_z, int Mode, int Injection_gap, int Packet_size, int Packet_num, flit** Eject, bool** Inject_avail, int Routing_mode, int SA_Mode, int** Downsteam_free_VC_0, int** Downsteam_free_VC_1);
     void produce();
     int consume();
 

@@ -3,7 +3,7 @@
 #include "pattern.h"
 #include<stdio.h>
 #include<stdlib.h>
-void local_unit::local_unit_init(int Cur_x, int Cur_y, int Cur_z, int Mode, int Injection_gap, int Packet_size, int Packet_num, flit** Eject, bool** Inject_avail, int Routing_mode, int SA_Mode){
+void local_unit::local_unit_init(int Cur_x, int Cur_y, int Cur_z, int Mode, int Injection_gap, int Packet_size, int Packet_num, flit** Eject, bool** Inject_avail, int Routing_mode, int SA_Mode, int** Downsteam_free_VC_0, int** Downsteam_free_VC_1){
     cycle_counter = 0;
 
     cur_x = Cur_x;
@@ -29,8 +29,18 @@ void local_unit::local_unit_init(int Cur_x, int Cur_y, int Cur_z, int Mode, int 
 		inject_control_counter[i] = 0;
 		inject_flit_counter[i] = 0;
 		inject[i].valid = false;
-
     }
+
+	// assign free VC number from downstream
+	for (int i = 0; i < PORT_NUM; ++i) {
+		downstream_vc_class_0_free_num[i] = Downsteam_free_VC_0[i];
+		downstream_vc_class_1_free_num[i] = Downsteam_free_VC_1[i];
+	}
+
+	for (int i = 0; i < PORT_NUM; ++i) {
+		prev_inject_avail_latch[i] = false;
+	}
+
 	credit_period_counter = 0;
     all_pckt_rcvd = false;
 }
@@ -176,12 +186,27 @@ void local_unit::produce(){
 
 		//if (!inject_avail_latch[i] && inject_avail_post_latch[i] && (credit_period_counter != CREDIT_BACK_PERIOD)){
 
-		int prev_inject_control_counter = inject_control_counter[i];
+		//int prev_inject_control_counter = inject_control_counter[i];
+
+		// Find the case that the current injection is blocked by passthrough, then need to restore the injection_control_counter to its previous value just to make sure that the next injection is still follow the injection check rule
+		if (prev_inject_avail_latch[i] == true && inject_avail_latch[i] == false && inject_control_counter[i] == 1) {
+			inject_control_counter[i] = injection_gap + packet_size + 1;
+		}
 
 		if (inject_avail_latch[i]) {
+			// point to the next packet after the current one is finished injection
 			if (inject_control_counter[i] == packet_size && inject_avail_latch[i])										// increment the injectiong counter every time inject occurs
 				inject_pckt_counter[i]++;
-			inject_control_counter[i] = (inject_control_counter[i] <= injection_gap + packet_size) ? inject_control_counter[i] + 1 : 1;
+			// increment the injection control counter
+			if (inject_control_counter[i] == 0 || inject_control_counter[i] == injection_gap + packet_size + 1) {		// When about to inject the HEAD_FLIT or SINGLE_FLIT, first check if the downstream has free VC available
+				bool cur_packet_vc_class = (i >= 3);
+				if ((cur_packet_vc_class == 0 && *(downstream_vc_class_0_free_num[i]) > 0) || (cur_packet_vc_class == 1 && *(downstream_vc_class_1_free_num[i]) > 0)) {
+					inject_control_counter[i] = (inject_control_counter[i] <= injection_gap + packet_size) ? inject_control_counter[i] + 1 : 1;
+				}
+			}
+			else {
+				inject_control_counter[i] = (inject_control_counter[i] <= injection_gap + packet_size) ? inject_control_counter[i] + 1 : 1;
+			}
 		}
 		
 /*
@@ -199,6 +224,8 @@ void local_unit::produce(){
 			}
 		}
 */
+
+/*
 		// counting how many cycles has elapsed since the block of the current injection
 		int current_alrogithm = routing_mode * 3 + sa_mode;
 		if (inject_control_counter[i] == 1)
@@ -214,7 +241,7 @@ void local_unit::produce(){
 		if (injection_blocked_counter[routing_mode][i][cur_z][cur_y][cur_x] > SATURATION_THRESHOLD * (packet_size+injection_gap)) {
 			staturation_status[routing_mode][i][cur_z][cur_y][cur_x] = true;
 		}
-
+*/
 		///////////////////////////////////////////////////////////////////////////////////////////////////////
 		// Start of injection
 		///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -283,7 +310,6 @@ void local_unit::produce(){
 		//				inject_pckt_counter[i]++;
                     }
                 }
-                inject[i].valid = true;
                 inject[i].VC_class = (i >= 3);
                     
                 inject[i].inject_dir = i + 1;
@@ -297,9 +323,18 @@ void local_unit::produce(){
 				inject[i].O1TURN_id = -1;
                 //inject[i].packet_size = pattern[i][cur_z][cur_y][cur_x][inject_pckt_counter[i]].packet_size;
 
-            //log the injected packet
-
-                    
+				// Assign the valid based on the downstream VC available status
+				if (inject[i].flit_type == HEAD_FLIT || inject[i].flit_type == SINGLE_FLIT) {
+					if ((inject[i].VC_class == 0 && *(downstream_vc_class_0_free_num[i]) > 0) || (inject[i].VC_class == 1 && *(downstream_vc_class_1_free_num[i]) > 0)) {
+						inject[i].valid = true;
+					}
+					else {
+						inject[i].valid = false;
+					}
+				}
+				else {
+					inject[i].valid = true;
+				}
 
             }
             else{
@@ -326,10 +361,12 @@ void local_unit::produce(){
 		else
 			inject[i].valid = false;
 
+
+		// Assign the previous injection latch status, use this to determine the cases where the current injection is blocked by passthrough
+		prev_inject_avail_latch[i] = inject_avail_latch[i];
+
     }
 
-
-
-
+	// increment the cycle counter
     cycle_counter++;
 }

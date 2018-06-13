@@ -37,13 +37,9 @@ void N_to_1_reductor::alloc(int N_Fan_in){
     }
 	cycle_counter= 0;
 
-	
-
-    
-
 }
 
-void N_to_1_reductor::N_to_1_reductor_init(int Cur_x, int Cur_y, int Cur_z, int Out_dir, int Level, int Id, int Mode, flit** In_list, bool* Out_avail){   
+void N_to_1_reductor::N_to_1_reductor_init(int Cur_x, int Cur_y, int Cur_z, int Out_dir, int Level, int Id, int Mode, flit** In_list, bool* Out_avail, int* Downsteam_free_VC_0, int* Downsteam_free_VC_1){
     //init all the arrays
 	cur_x = Cur_x;
 	cur_y = Cur_y;
@@ -53,8 +49,23 @@ void N_to_1_reductor::N_to_1_reductor_init(int Cur_x, int Cur_y, int Cur_z, int 
     level = Level;
     id = Id;
     selector = 0;
+	selector_valid = false;
     occupy = false;
     mode = Mode;
+
+	// assign free VC number from downstream
+	downstream_vc_class_0_free_num = Downsteam_free_VC_0;
+	downstream_vc_class_1_free_num = Downsteam_free_VC_1;
+
+	// debugging purpose only
+	occupy_inject_dir = 0;
+	occupy_src_x = 0;
+	occupy_src_y = 0;
+	occupy_src_z = 0;
+	occupy_dst_x = 0;
+	occupy_dst_y = 0;
+	occupy_dst_z = 0;
+	occupy_packet_id = 0;
 
     for(int i = 0; i < N_fan_in; ++i){
         flit_in[i] = In_list[i];
@@ -77,7 +88,7 @@ void N_to_1_reductor::consume(){
     //latch the flit in
     for(int i = 0; i < N_fan_in; ++i){
         in_latch[i] = *(flit_in[i]);
-		if (i == selector){
+		if (i == selector && selector_valid){
 			out_avail_latch_to_fifos[i] = out_avail_latch;
 		}
 		else{
@@ -85,8 +96,20 @@ void N_to_1_reductor::consume(){
 		}
     }
 
-	if (occupy && out_avail_latch && out.valid && out.flit_type == TAIL_FLIT)
+	// Free the current reductor when the tail flit is send out
+	if (occupy && out_avail_latch && out.valid && out.flit_type == TAIL_FLIT) {
 		occupy = false;
+		selector_valid = false;
+		// debugging purpose only
+		occupy_inject_dir = 0;
+		occupy_src_x = 0;
+		occupy_src_y = 0;
+		occupy_src_z = 0;
+		occupy_dst_x = 0;
+		occupy_dst_y = 0;
+		occupy_dst_z = 0;
+		occupy_packet_id = 0;
+	}
 
 	for (int i = 0; i < N_fan_in; ++i){
 		in_Q_inst[i].consume();
@@ -127,23 +150,47 @@ int N_to_1_reductor::produce(){
 				}
 
 				if (in_slot[i].valid && (in_slot[i].flit_type == HEAD_FLIT || in_slot[i].flit_type == SINGLE_FLIT) && cur_priority > max) {
-					selector = i;
-					max = cur_priority;
+					// check if the downstream has available VC slot for this packet
+					if ((in_slot[i].VC_class == false && *downstream_vc_class_0_free_num > 0) || (in_slot[i].VC_class == true && *downstream_vc_class_1_free_num > 0)) {
+						selector = i;
+						max = cur_priority;
+						selector_valid = true;
+					}
 				}
 				if (mode == SA_MIXED) {
 					if (in_slot[i].valid && (in_slot[i].flit_type == HEAD_FLIT || in_slot[i].flit_type == SINGLE_FLIT) && cycle_counter - in_slot[i].priority_age > SA_AGE_THRESHOLD) {
-						selector = i;
-						break;
+						// check if the downstream has available VC slot for this packet
+						if ((in_slot[i].VC_class == false && *downstream_vc_class_0_free_num > 0) || (in_slot[i].VC_class == true && *downstream_vc_class_1_free_num > 0)) {
+							selector = i;
+							selector_valid = true;
+							break;
+						}
 					}
 				}
 			}
 		}
 	}
 	//then produce out 
-	out = in_slot[selector];
-	if (out.valid && (out.flit_type == HEAD_FLIT || out.flit_type == BODY_FLIT))
-		occupy = true;
+	if (selector_valid) {
+		out = in_slot[selector];
+	}
+	else {
+		out.valid = false;
+	}
 
+	// Set occupy signal
+	if (out.valid && (out.flit_type == HEAD_FLIT || out.flit_type == BODY_FLIT)) {
+		occupy = true;
+		// debugging purpose only
+		occupy_inject_dir = out.inject_dir;
+		occupy_src_x = out.src_x;
+		occupy_src_y = out.src_y;
+		occupy_src_z = out.src_z;
+		occupy_dst_x = out.dst_x;
+		occupy_dst_y = out.dst_y;
+		occupy_dst_z = out.dst_z;
+		occupy_packet_id = out.packet_id;
+	}
 
 //	else if (out.valid && out.flit_type == TAIL_FLIT && out_avail_latch)
 //		occupy = false;

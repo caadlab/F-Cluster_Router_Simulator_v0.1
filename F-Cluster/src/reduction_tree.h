@@ -30,6 +30,11 @@ public:
     
     flit out;
     flit* in_slot;
+
+	int* downstream_vc_class_0_free_num;
+	int* downstream_vc_class_1_free_num;
+
+	bool* out_dir_match;			// if the head flit taking this direction, then set for all the body and tail flits, when the tail flit left, reset this one as false
  
 	N_to_1_reductor* l1_reductors;//will allocated by l1_N slots after init
     N_to_1_reductor* l2_reductors;//will allocated by l2_N slots after init
@@ -45,7 +50,7 @@ public:
 	bool** in_avail_l4_to_l3;
 	bool* out_avail_to_l4;
     
-    void reduction_tree_init(int Cur_x, int Cur_y, int Cur_z, int N_Fan_in, int Out_dir, int Level_num, int Mode, int L1_N, int L2_N, int L3_N, flit** In_list, bool* Out_avail);
+    void reduction_tree_init(int Cur_x, int Cur_y, int Cur_z, int N_Fan_in, int Out_dir, int Level_num, int Mode, int L1_N, int L2_N, int L3_N, flit** In_list, bool* Out_avail, int* Downsteam_free_VC_0, int* Downsteam_free_VC_1);
     void consume();
     int produce();
 	void reduction_tree_free();

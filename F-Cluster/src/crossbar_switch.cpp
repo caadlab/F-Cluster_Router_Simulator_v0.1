@@ -149,7 +149,7 @@ int crossbar_switch::report_pattern_left(int injection_direction, int check_z, i
 	return 0;
 }
 
-void crossbar_switch::crossbar_switch_init(int Cur_x, int Cur_y, int Cur_z, int Mode, flit** In_list, bool** Out_avail){
+void crossbar_switch::crossbar_switch_init(int Cur_x, int Cur_y, int Cur_z, int Mode, flit** In_list, bool** Out_avail, int** Downsteam_free_VC_0, int** Downsteam_free_VC_1){
 	
 	cur_x = Cur_x;
 	cur_y = Cur_y;
@@ -159,6 +159,12 @@ void crossbar_switch::crossbar_switch_init(int Cur_x, int Cur_y, int Cur_z, int 
 	N_fan_in = N_FAN_IN;											// PORT_NUM * VC_NUM
 	N_fan_out = PORT_NUM;
     mode = Mode;
+
+	// assign free VC number from downstream
+	for (int i = 0; i < PORT_NUM; ++i) {
+		downstream_vc_class_0_free_num[i] = Downsteam_free_VC_0[i];
+		downstream_vc_class_1_free_num[i] = Downsteam_free_VC_1[i];
+	}
 	for(int j = 0; j < N_FAN_IN; ++j)
 		in_latch[j].valid = false;
 
@@ -185,10 +191,8 @@ void crossbar_switch::crossbar_switch_init(int Cur_x, int Cur_y, int Cur_z, int 
         out_avail_to_tree[i] = &out_avail_latch[i];
     }
     
-
-
     for(int i = 0; i < PORT_NUM; ++i){
-        tree_list[i].reduction_tree_init(cur_x, cur_y, cur_z, N_fan_in, i + 1, 4, mode, 18, 6, 2, in_list_to_tree, out_avail_to_tree[i]);
+        tree_list[i].reduction_tree_init(cur_x, cur_y, cur_z, N_fan_in, i + 1, 4, mode, 18, 6, 2, in_list_to_tree, out_avail_to_tree[i], downstream_vc_class_0_free_num[i], downstream_vc_class_1_free_num[i]);
     }
     
 
@@ -210,6 +214,7 @@ void crossbar_switch::consume(){
     for(int i = 0; i < PORT_NUM; ++i){
         tree_list[i].consume();
     }
+
     return;
 }
 

@@ -860,6 +860,9 @@ void routing_comp::produce(){
 			dir = RLB(dir_in, cur_x, cur_y, cur_z, in_latch.dst_x, in_latch.dst_y, in_latch.dst_z);
 	}
 
+	/////////////////////////////////////////////////////////
+	// Determine VC class
+	/////////////////////////////////////////////////////////
     bool new_VC_class; 
     //the VC_class needs to be changed when either crossing the dateline or changing dimension
     bool old_VC_class = in_latch.VC_class;
@@ -948,6 +951,11 @@ void routing_comp::produce(){
 	}
 	else {
 		in_avail = false;					// this actually not used in router.app
+		// if the current head flit is waiting for allocation, still need to update it's output dir, since the credit status is changing, but the priority distance should remain the same since it's got deducted in the first place for the head flit
+		if (in_latch.valid) {
+			flit_after_RC.dir_out = dir;
+			flit_after_RC.VC_class = new_VC_class;
+		}
 		out = flit_after_RC;
 	}
 

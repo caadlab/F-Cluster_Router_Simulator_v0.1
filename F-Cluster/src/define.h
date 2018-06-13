@@ -1,14 +1,14 @@
 #ifndef DEFINE_H
 #define DEFINE_H
 
-# define MAX_SIMULATION_CYCLE 20000
+# define MAX_SIMULATION_CYCLE 200000
 
 #define SATURATION_THRESHOLD 	2			// This one times (injection_gap+packet_size), denotes the injection buffer size, if the time injection a packet is larger than that value, then saturated													
 
 #define FLIT_SIZE 128
 #define PHIT_SIZE 256
 #define IN_Q_SIZE 256												// input buffer size			// directly related with the link credit, if the input queue is full, then the credit available will be 0
-#define VC_SIZE 256// has to bigger than PACKET_SIZE				// the number of flits can be stored in VC buffers (FIFOs)
+#define VC_SIZE 128// has to bigger than PACKET_SIZE				// the number of flits can be stored in VC buffers (FIFOs)
 #define VC_NUM 9			// don't change this one
 
 //#define ALLOW_VC_NUM 9		// modify this one to change the number of VCs per port		// Used in VCs.cpp when assigning idle VC to headflits
@@ -93,7 +93,7 @@ tail flit
 #define SA_AGE_THRESHOLD 500
 
 #define INPUT_Q_SIZE 256
-#define CREDIT_BACK_PERIOD 100
+#define CREDIT_BACK_PERIOD 10
 #define CREDIT_THRESHOlD CREDIT_BACK_PERIOD + LINKDELAY + 20
 
 #define INJECTION_NEAREST_NEIGHBOR 1

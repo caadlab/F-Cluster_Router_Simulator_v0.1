@@ -269,17 +269,28 @@ void router::router_init(int Cur_x, int Cur_y, int Cur_z, int SA_Mode, int Routi
 		inject_latch[i].valid = false;
 		in_latch[i].valid = false;
 
+		upstream_vc_class_0_free_num[i] = 0;
+		upstream_vc_class_1_free_num[i] = 0;
+		downstream_vc_class_0_free_num[i] = allow_vc_num - 1;
+		downstream_vc_class_1_free_num[i] = allow_vc_num - 1;
+
 		for (int vc_counter = 0; vc_counter < VC_NUM; ++vc_counter) {
 			downstream_vc_credits[i][vc_counter] = VC_SIZE - 1;
 		}
     }
+
+	// assign the pointer for downstream VC free numbers
+	for (int i = 0; i < PORT_NUM; ++i) {
+		downstream_vc_class_0_free_num_ptr[i] = &downstream_vc_class_0_free_num[i];
+		downstream_vc_class_1_free_num_ptr[i] = &downstream_vc_class_1_free_num[i];
+	}
 
 	for (int i = 0; i < PORT_NUM; ++i) {
 		eject_ptrs[i] = &eject[i];
 		inject_avail_ptrs[i] = &out_avail_for_inject[i];
 	}
 
-	app_core.local_unit_init(cur_x, cur_y, cur_z, injection_mode, Injection_gap, Packet_size, PACKET_NUM, eject_ptrs, inject_avail_ptrs, routing_mode, SA_mode);
+	app_core.local_unit_init(cur_x, cur_y, cur_z, injection_mode, Injection_gap, Packet_size, PACKET_NUM, eject_ptrs, inject_avail_ptrs, routing_mode, SA_mode, downstream_vc_class_0_free_num_ptr, downstream_vc_class_1_free_num_ptr);
 
     //allocate space for those subentities need dynamic allocation
 
@@ -308,7 +319,7 @@ void router::router_init(int Cur_x, int Cur_y, int Cur_z, int SA_Mode, int Routi
     for(int i = 0; i < PORT_NUM; ++i){
         in_avail_from_ST[i] = &(out_avail_for_passthru[i]); //initially this is for injetion   
     }
-	xbar.crossbar_switch_init(cur_x, cur_y, cur_z, SA_mode, flit_list_to_SA, in_avail_from_ST);
+	xbar.crossbar_switch_init(cur_x, cur_y, cur_z, SA_mode, flit_list_to_SA, in_avail_from_ST, downstream_vc_class_0_free_num_ptr, downstream_vc_class_1_free_num_ptr);
 
 
     //init all avails
@@ -330,6 +341,8 @@ int router::consume(){
 		// take in the credit from downsteam node
         if(in[i]->valid && in[i]->flit_type == CREDIT_FLIT){
             downstream_credits[i] = in[i]->payload;
+			downstream_vc_class_0_free_num[i] = in[i]->vc_class_0_free_num;
+			downstream_vc_class_1_free_num[i] = in[i]->vc_class_1_free_num;
 			// assign the downstream VC credits
 			for (int vc_counter = 0; vc_counter < VC_NUM; ++vc_counter) {
 				downstream_vc_credits[i][vc_counter] = in[i]->vc_credit[vc_counter];
@@ -342,27 +355,27 @@ int router::consume(){
       //  inject_latch[i] = *(inject[i]);
     }
     
-/*
+
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// Debugging printout for tracing the path of a certain pattern
 	// Only check this after the RC and SA is done so it will give the routing information
 	////////////////////////////////////////////////////////////////////////////////////////////////
-	int pattern_check_injection_direction = DIR_XPOS;				// Use symbols like DIR_XPOS, DIR_YPOS, etc to specify, as the flit.injection_direction starts from 1. Ex.: if checking pattern[1][x][x][x][x], then set this as DIR_YPOS 
+	int pattern_check_injection_direction = DIR_YNEG;				// Use symbols like DIR_XPOS, DIR_YPOS, etc to specify, as the flit.injection_direction starts from 1. Ex.: if checking pattern[1][x][x][x][x], then set this as DIR_YPOS 
 	int pattern_check_z = 0;
-	int pattern_check_y = 5;
-	int pattern_check_x = 3;
+	int pattern_check_y = 1;
+	int pattern_check_x = 1;
 	int pattern_check_packet_id = 0;
 	int pattern_check_flit_id = 0;
 	int pattern_check_flit_type = HEAD_FLIT;
 	for (int i = 0; i < PORT_NUM; ++i) {
 		if (in_latch[i].valid) {
 			report_pattern_received(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, pattern_check_flit_type, 0, &in_latch[i], i);
-			//report_pattern_received(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, BODY_FLIT, 1, &in_latch[i], i);
-			//report_pattern_received(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, BODY_FLIT, 2, &in_latch[i], i);
-			//report_pattern_received(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, TAIL_FLIT, 3, &in_latch[i], i);
+			report_pattern_received(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, BODY_FLIT, 1, &in_latch[i], i);
+			report_pattern_received(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, BODY_FLIT, 2, &in_latch[i], i);
+			report_pattern_received(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, TAIL_FLIT, 0, &in_latch[i], i);
 		}
 	}
-*/
+
 	////////////////////////////////////////////////
     //call all the consume for the subentities
 	////////////////////////////////////////////////
@@ -620,16 +633,33 @@ int router::produce(){
 		// the credit = input_buffer_size - #_of_words_in_buffer
         upstream_credits[i] = IN_Q_SIZE - 1 - input_buffer_list[i].usedw;
 
+		// collect the free VC number for each class
+		upstream_vc_class_0_free_num[i] = 0;
+		upstream_vc_class_1_free_num[i] = 0;
+		for (int vc_ptr = 0; vc_ptr < allow_vc_num; ++vc_ptr) {
+			if (VCs_list[i].VC_state[vc_ptr] == VC_IDLE) {
+				if (vc_ptr >= 0 && vc_ptr < allow_vc_num - 1) {		// current free VC belongs to vc_class 0
+					upstream_vc_class_0_free_num[i]++;
+				}
+				if (vc_ptr > 0 && vc_ptr < allow_vc_num) {		// current free VC belongs to vc_class 1
+					upstream_vc_class_1_free_num[i]++;
+				}
+			}
+		}
+
 		// send out credit flit to upsteam node every CREDIT_BACK_PERIOD
 		if (credit_period_counter == CREDIT_BACK_PERIOD - 1) {
 			out[i].valid = true;
 			out[i].flit_type = CREDIT_FLIT;
 			// assign input buffer's credit
 			out[i].payload = upstream_credits[i];
-			// assign each VC buffer's credit
+			// assign each VC buffer's credit (this is not used in the current implementation)
 			for (int vc_counter = 0; vc_counter < VC_NUM; ++vc_counter) {
 				out[i].vc_credit[vc_counter] = VC_SIZE - 1 - VCs_list[i].VC_array[vc_counter].usedw;
 			}
+			// assign free VC counter
+			out[i].vc_class_0_free_num = upstream_vc_class_0_free_num[i];
+			out[i].vc_class_1_free_num = upstream_vc_class_1_free_num[i];
         }
 		// downstream credit is taken during consume process
 		else if (downstream_credits[i] < CREDIT_THRESHOlD) {
@@ -646,8 +676,19 @@ int router::produce(){
 //			out[i].valid = false;
 		else 
 			out[i] = app_core.inject[i];
-
     }
+
+	// update the downstream available VC slots
+	for (int i = 0; i < PORT_NUM; ++i) {
+		if (out[i].valid && (out[i].flit_type == HEAD_FLIT || out[i].flit_type == SINGLE_FLIT)) {
+			if (downstream_vc_class_0_free_num[i] > 0 && out[i].VC_class == 0) {
+				downstream_vc_class_0_free_num[i]--;
+			}
+			if (downstream_vc_class_1_free_num[i] > 0 && out[i].VC_class == 1) {
+				downstream_vc_class_1_free_num[i]--;
+			}
+		}
+	}
 
 	//update the eject
 	for (int i = 0; i < PORT_NUM; ++i){
@@ -672,22 +713,24 @@ int router::produce(){
 	}
 
 
-/*
+
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// Debugging info: Checking the point when a certain flit has been injected
 	// Use appcore.inject[i] as the input flit for checking
 	////////////////////////////////////////////////////////////////////////////////////////////////
-	int pattern_check_injection_direction = DIR_XPOS;							// Use symbols like DIR_XPOS, DIR_YPOS, etc to specify, as the flit.injection_direction starts from 1. Ex.: if checking pattern[1][x][x][x][x], then set this as DIR_YPOS 
+	int pattern_check_injection_direction = DIR_YNEG;							// Use symbols like DIR_XPOS, DIR_YPOS, etc to specify, as the flit.injection_direction starts from 1. Ex.: if checking pattern[1][x][x][x][x], then set this as DIR_YPOS 
 	int pattern_check_z = 0;
-	int pattern_check_y = 5;
-	int pattern_check_x = 3;
+	int pattern_check_y = 1;
+	int pattern_check_x = 1;
 	int pattern_check_packet_id = 0;
 	int pattern_check_flit_id = 0;
 	int pattern_check_flit_type = HEAD_FLIT;
 	for (int i = 0; i < PORT_NUM; ++i) {
 		if (app_core.inject[i].valid) {
 			report_pattern_injected(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, pattern_check_flit_type, 0, &app_core.inject[i]);
-			//report_pattern_injected(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, BODY_FLIT, pattern_check_flit_id, &app_core.inject[i]);
+			report_pattern_injected(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, BODY_FLIT, 1, &app_core.inject[i]);
+			report_pattern_injected(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, BODY_FLIT, 2, &app_core.inject[i]);
+			report_pattern_injected(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, TAIL_FLIT, 0, &app_core.inject[i]);
 		}
 	}
 
@@ -698,10 +741,12 @@ int router::produce(){
 	for (int i = 0; i < PORT_NUM; ++i) {
 		if (out[i].valid) {
 			report_pattern_sent(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, pattern_check_flit_type, 0, &out[i]);
-			//report_pattern_sent(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, pattern_check_flit_type, pattern_check_flit_id, &out[i]);
+			report_pattern_sent(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, BODY_FLIT, 1, &out[i]);
+			report_pattern_sent(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, BODY_FLIT, 2, &out[i]);
+			report_pattern_sent(pattern_check_injection_direction, pattern_check_z, pattern_check_y, pattern_check_x, pattern_check_packet_id, TAIL_FLIT, 0, &out[i]);
 		}
 	}
-*/
+
 	return 0;
 
 }

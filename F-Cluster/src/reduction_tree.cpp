@@ -75,7 +75,7 @@ int reduction_tree::report_pattern_on_reductor_input(int injection_direction, in
 
 
 
-void reduction_tree::reduction_tree_init(int Cur_x, int Cur_y, int Cur_z, int N_Fan_in, int Out_dir, int Level_num, int Mode, int L1_N, int L2_N, int L3_N, flit** In_list, bool* Out_avail){
+void reduction_tree::reduction_tree_init(int Cur_x, int Cur_y, int Cur_z, int N_Fan_in, int Out_dir, int Level_num, int Mode, int L1_N, int L2_N, int L3_N, flit** In_list, bool* Out_avail, int* Downsteam_free_VC_0, int* Downsteam_free_VC_1){
 	cur_x = Cur_x;
 	cur_y = Cur_y;
 	cur_z = Cur_z;
@@ -88,31 +88,42 @@ void reduction_tree::reduction_tree_init(int Cur_x, int Cur_y, int Cur_z, int N_
     l2_N = L2_N;
     l3_N = L3_N;
     l4_N = 1;
+
+	// assign free VC number from downstream
+	downstream_vc_class_0_free_num = Downsteam_free_VC_0;
+	downstream_vc_class_1_free_num = Downsteam_free_VC_1;
+
     if(!(flit_in = (flit**)malloc(N_fan_in * sizeof(flit*)))){
 		printf("No mem space for %d slots for flit** flit_in in reductor tree in %d dir\n", N_fan_in, out_dir);
         exit(-1);
     }
     
     if(!(in_latch = (flit*)malloc(N_fan_in * sizeof(flit)))){
-        printf("No mem space for %d slots for flit* in_latch in reductor in %d dir\n", N_fan_in, out_dir);
+        printf("No mem space for %d slots for flit* in_latch in reduction tree in %d dir\n", N_fan_in, out_dir);
         exit(-1);
     }   
 
     if(!(in_avail = (bool*)malloc(N_fan_in * sizeof(bool)))){
-        printf("No mem space for %d slots for bool* in_avail in reductor in %d dir\n", N_fan_in, out_dir);
+        printf("No mem space for %d slots for bool* in_avail in reduction tree in %d dir\n", N_fan_in, out_dir);
         exit(-1);
     }
     
     if(!(in_slot = (flit*)malloc(N_fan_in * sizeof(flit)))){
-        printf("No mem space for %d slots for N_fan_in* in_slot in reductor in %d dir\n", N_fan_in, out_dir);
+        printf("No mem space for %d slots for N_fan_in* in_slot in reduction tree in %d dir\n", N_fan_in, out_dir);
         exit(-1);
     }
+
+	if (!(out_dir_match = (bool*)malloc(N_fan_in * sizeof(bool)))) {
+		printf("No mem space for %d slots for bool* out_dir_match in reduction tree in %d dir\n", N_fan_in, out_dir);
+		exit(-1);
+	}
 
     for(int i = 0; i < N_fan_in; ++i){
         flit_in[i] = In_list[i];
         in_latch[i].valid = false;
         in_avail[i] = true;
         in_slot[i].valid = false;
+		out_dir_match[i] = false;
     }
     out_avail_latch = true;
     out_avail = Out_avail;
@@ -211,16 +222,16 @@ void reduction_tree::reduction_tree_init(int Cur_x, int Cur_y, int Cur_z, int N_
     out_avail_to_l4 = &out_avail_latch; 
     
     for(int i = 0; i < l1_N; ++i){
-        l1_reductors[i].N_to_1_reductor_init(cur_x, cur_y, cur_z, out_dir, 1, i, mode, &(flit_to_l1[i * l1_W]), in_avail_l2_to_l1[i]);
+        l1_reductors[i].N_to_1_reductor_init(cur_x, cur_y, cur_z, out_dir, 1, i, mode, &(flit_to_l1[i * l1_W]), in_avail_l2_to_l1[i], downstream_vc_class_0_free_num, downstream_vc_class_1_free_num);
     }
     for(int i = 0; i < l2_N; ++i){
-		l2_reductors[i].N_to_1_reductor_init(cur_x, cur_y, cur_z, out_dir, 2, i, mode, &(flit_l1_to_l2[i * l2_W]), in_avail_l3_to_l2[i]);
+		l2_reductors[i].N_to_1_reductor_init(cur_x, cur_y, cur_z, out_dir, 2, i, mode, &(flit_l1_to_l2[i * l2_W]), in_avail_l3_to_l2[i], downstream_vc_class_0_free_num, downstream_vc_class_1_free_num);
     }
     for(int i = 0; i < l3_N; ++i){
-		l3_reductors[i].N_to_1_reductor_init(cur_x, cur_y, cur_z, out_dir, 3, i, mode, &(flit_l2_to_l3[i * l3_W]), in_avail_l4_to_l3[i]);
+		l3_reductors[i].N_to_1_reductor_init(cur_x, cur_y, cur_z, out_dir, 3, i, mode, &(flit_l2_to_l3[i * l3_W]), in_avail_l4_to_l3[i], downstream_vc_class_0_free_num, downstream_vc_class_1_free_num);
     }   
 
-	l4_reductor.N_to_1_reductor_init(cur_x, cur_y, cur_z, out_dir, 4, 0, mode, flit_l3_to_l4, out_avail_to_l4);
+	l4_reductor.N_to_1_reductor_init(cur_x, cur_y, cur_z, out_dir, 4, 0, mode, flit_l3_to_l4, out_avail_to_l4, downstream_vc_class_0_free_num, downstream_vc_class_1_free_num);
 
 }
 
